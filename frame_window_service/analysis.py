@@ -37,6 +37,12 @@ class SequenceRun:
     point: Extremum
 
 
+def _is_truthy(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _parse_number(token: str, line_number: int) -> float:
     normalized = token.strip()
     if not normalized:
@@ -315,7 +321,7 @@ def _sign(value: float) -> int:
 
 
 def _event_rows_for_k(
-    extrema: list[Extremum], step: int
+    extrema: list[Extremum], step: int, *, center_events: bool = False
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
     diff_rows: list[dict[str, Any]] = []
     for start_index in range(0, len(extrema) - step):
@@ -356,11 +362,23 @@ def _event_rows_for_k(
                 continue
             if previous_nonzero is not None and _sign(previous_nonzero["signedDiff"]) != current_sign:
                 event_extremum = extrema[row["endOrdinal"] - 1]
+                event_local_index: float = float(event_extremum.local_index)
+                event_global_index: float = float(event_extremum.global_index)
+                event_amplitude = event_extremum.value
+                if center_events:
+                    event_index = row["endOrdinal"] - 1
+                    if 0 < event_index < len(extrema) - 1:
+                        left_extremum = extrema[event_index - 1]
+                        right_extremum = extrema[event_index + 1]
+                        if abs(left_extremum.value - right_extremum.value) <= 1e-9:
+                            event_local_index = (left_extremum.local_index + right_extremum.local_index) / 2.0
+                            event_global_index = (left_extremum.global_index + right_extremum.global_index) / 2.0
+                            event_amplitude = (left_extremum.value + right_extremum.value) / 2.0
                 event = {
-                    "localIndex": event_extremum.local_index,
-                    "globalIndex": event_extremum.global_index,
+                    "localIndex": event_local_index,
+                    "globalIndex": event_global_index,
                     "extremumOrdinal": event_extremum.ordinal,
-                    "amplitude": event_extremum.value,
+                    "amplitude": event_amplitude,
                     "signedDiff": row["signedDiff"],
                     "absDiff": abs(row["signedDiff"]),
                     "subseriesIndex": subseries_index,
@@ -419,7 +437,12 @@ def _event_rows_for_k(
     return diff_rows, sign_changes, sign_change_diff_rows, intervals
 
 
-def build_k_analyses(extrema: list[Extremum], max_k_raw: str | None) -> tuple[list[dict[str, Any]], int]:
+def build_k_analyses(
+    extrema: list[Extremum],
+    max_k_raw: str | None,
+    *,
+    center_events: bool = False,
+) -> tuple[list[dict[str, Any]], int]:
     if len(extrema) < 2:
         return [], -1
 
@@ -430,7 +453,11 @@ def build_k_analyses(extrema: list[Extremum], max_k_raw: str | None) -> tuple[li
     analyses: list[dict[str, Any]] = []
     for k in range(0, effective_max_k + 1):
         step = 2**k
-        diff_rows, sign_changes, sign_change_diff_rows, intervals = _event_rows_for_k(extrema, step)
+        diff_rows, sign_changes, sign_change_diff_rows, intervals = _event_rows_for_k(
+            extrema,
+            step,
+            center_events=center_events,
+        )
         analyses.append(
             {
                 "k": k,
@@ -728,6 +755,7 @@ def analyze_text(
     text: str,
     *,
     mode: str = "patent",
+    event_centering: str | None = None,
     frame_size: str | None,
     frame_number: str | None,
     manual_start: str | None,
@@ -743,15 +771,16 @@ def analyze_text(
         manual_start_raw=manual_start,
         manual_end_raw=manual_end,
     )
+    center_events = _is_truthy(event_centering)
     extrema = extract_extrema(frame_samples)
     if mode == "article":
         k_analyses, effective_max_k = build_article_analyses(extrema, max_k)
         mode_name = "Статейна логіка"
     elif mode == "patent-crossk":
-        k_analyses, effective_max_k = build_k_analyses(extrema, max_k)
+        k_analyses, effective_max_k = build_k_analyses(extrema, max_k, center_events=center_events)
         mode_name = "Патентна логіка: усереднення по T через усі k"
     else:
-        k_analyses, effective_max_k = build_k_analyses(extrema, max_k)
+        k_analyses, effective_max_k = build_k_analyses(extrema, max_k, center_events=center_events)
         mode_name = "Патентна логіка"
 
     all_intervals: list[dict[str, Any]] = []
@@ -772,6 +801,7 @@ def analyze_text(
     return {
         "mode": mode,
         "modeName": mode_name,
+        "eventCentering": center_events,
         "filename": filename or "uploaded.txt",
         "frameInfo": frame_info,
         "sourceCount": len(source_points),

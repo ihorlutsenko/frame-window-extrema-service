@@ -94,6 +94,7 @@ function renderSummary(result) {
 
   const cards = [
     ["Режим", result.modeName || result.mode || "невідомо"],
+    ["Центрування sign-change", result.eventCentering ? "увімкнено" : "вимкнено"],
     ["Файл", result.filename],
     ["Вхідних спостережень", result.sourceCount],
     ["Обраний режим", modeText],

@@ -82,6 +82,7 @@ def create_app() -> Flask:
             result = analyze_text(
                 text,
                 mode=mode,
+                event_centering=request.form.get("event_centering"),
                 frame_size=request.form.get("frame_size"),
                 frame_number=request.form.get("frame_number"),
                 manual_start=request.form.get("manual_start"),

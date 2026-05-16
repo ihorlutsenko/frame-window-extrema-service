@@ -122,6 +122,21 @@ class FrameWindowAnalysisTests(unittest.TestCase):
             ],
         )
 
+    def test_centered_event_places_sign_change_midway_between_equal_extrema(self) -> None:
+        extrema = [
+            Extremum(ordinal=1, global_index=1, local_index=1, value=-1, kind="min"),
+            Extremum(ordinal=2, global_index=4, local_index=4, value=-1, kind="min"),
+            Extremum(ordinal=3, global_index=6, local_index=6, value=0, kind="max"),
+            Extremum(ordinal=4, global_index=9, local_index=9, value=-1, kind="min"),
+            Extremum(ordinal=5, global_index=13, local_index=13, value=0, kind="max"),
+        ]
+        analyses_plain, _ = build_k_analyses(extrema, "0", center_events=False)
+        analyses_centered, _ = build_k_analyses(extrema, "0", center_events=True)
+        plain_changes = analyses_plain[0]["signChanges"]
+        centered_changes = analyses_centered[0]["signChanges"]
+        self.assertEqual([row["localIndex"] for row in plain_changes], [9.0, 13.0])
+        self.assertEqual([row["localIndex"] for row in centered_changes], [9.5, 13.0])
+
     def test_analyze_text_exposes_frequency_for_groups(self) -> None:
         result = analyze_text(
             "1\n5\n2\n4\n1\n6\n2\n",
