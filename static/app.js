@@ -172,8 +172,10 @@ function drawChart(svg, series, xLabel, yLabel, options = {}) {
     yMax += 1;
   }
 
-  const xPad = Math.max(1, (xMax - xMin) * 0.03);
-  const yPad = Math.max(0.5, (yMax - yMin) * 0.08);
+  const xRange = xMax - xMin;
+  const yRange = yMax - yMin;
+  const xPad = xRange * 0.03;
+  const yPad = yRange * 0.08;
   xMin -= xPad;
   xMax += xPad;
   yMin -= yPad;
