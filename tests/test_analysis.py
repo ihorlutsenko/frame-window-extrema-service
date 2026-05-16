@@ -5,6 +5,7 @@ import unittest
 from frame_window_service.analysis import (
     Extremum,
     build_article_analyses,
+    build_patent_crossk_spectrum_groups,
     extract_extrema,
     group_intervals,
     parse_input_text,
@@ -180,6 +181,29 @@ class FrameWindowAnalysisTests(unittest.TestCase):
         spectrum_avg_durations = sorted(round(group["avgDuration"], 2) for group in result["spectrumGroups"])
         self.assertTrue(any(abs(value - 166.67) < 1.5 for value in spectrum_avg_durations))
         self.assertTrue(any(abs(value - 500.0) < 0.3 for value in spectrum_avg_durations))
+
+    def test_patent_crossk_merges_equal_durations_from_different_k(self) -> None:
+        groups = build_patent_crossk_spectrum_groups(
+            [
+                {
+                    "k": 0,
+                    "intervals": [
+                        {"duration": 10, "absAmplitudeDiff": 4, "startSubseriesIndex": 1},
+                        {"duration": 12, "absAmplitudeDiff": 8, "startSubseriesIndex": 1},
+                    ],
+                },
+                {
+                    "k": 2,
+                    "intervals": [
+                        {"duration": 10, "absAmplitudeDiff": 6, "startSubseriesIndex": 3},
+                    ],
+                },
+            ]
+        )
+        self.assertEqual([group["avgDuration"] for group in groups], [10.0, 12.0])
+        self.assertAlmostEqual(groups[0]["avgAmplitude"], (4 + 6) / 4)
+        self.assertAlmostEqual(groups[0]["avgFrequency"], 1 / 20)
+        self.assertEqual(groups[0]["count"], 2)
 
 
 if __name__ == "__main__":

@@ -650,6 +650,32 @@ def build_patent_spectrum_groups(k_analyses: list[dict[str, Any]]) -> list[dict[
     return spectrum_groups
 
 
+def build_patent_crossk_spectrum_groups(k_analyses: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped_rows: dict[float, list[dict[str, Any]]] = {}
+    for analysis in k_analyses:
+        for row in analysis["intervals"]:
+            grouped_rows.setdefault(float(row["duration"]), []).append(dict(row, k=analysis["k"]))
+
+    spectrum_groups: list[dict[str, Any]] = []
+    for duration in sorted(grouped_rows):
+        rows = grouped_rows[duration]
+        amplitude_moduli = [row["absAmplitudeDiff"] for row in rows]
+        spectrum_groups.append(
+            {
+                "groupIndex": len(spectrum_groups) + 1,
+                "avgDuration": duration,
+                "avgAmplitude": sum(amplitude_moduli) / (2 * len(amplitude_moduli)),
+                "avgFrequency": 1.0 / (2.0 * duration),
+                "count": len(rows),
+                "minDuration": duration,
+                "maxDuration": duration,
+                "rows": rows,
+            }
+        )
+
+    return spectrum_groups
+
+
 def build_article_spectrum_groups(k_analyses: list[dict[str, Any]]) -> list[dict[str, Any]]:
     groups: list[dict[str, Any]] = []
     for analysis in k_analyses:
@@ -721,6 +747,9 @@ def analyze_text(
     if mode == "article":
         k_analyses, effective_max_k = build_article_analyses(extrema, max_k)
         mode_name = "Статейна логіка"
+    elif mode == "patent-crossk":
+        k_analyses, effective_max_k = build_k_analyses(extrema, max_k)
+        mode_name = "Патентна логіка: усереднення по T через усі k"
     else:
         k_analyses, effective_max_k = build_k_analyses(extrema, max_k)
         mode_name = "Патентна логіка"
@@ -735,6 +764,8 @@ def analyze_text(
     grouped = group_intervals(all_intervals)
     if mode == "article":
         spectrum_groups = build_article_spectrum_groups(k_analyses)
+    elif mode == "patent-crossk":
+        spectrum_groups = build_patent_crossk_spectrum_groups(k_analyses)
     else:
         spectrum_groups = build_patent_spectrum_groups(k_analyses)
 

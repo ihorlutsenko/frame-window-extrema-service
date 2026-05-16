@@ -50,6 +50,20 @@ def create_app() -> Flask:
             api_path="/api/analyze/article",
         )
 
+    @app.get("/patent-crossk/")
+    def patent_crossk_page() -> str:
+        return render_mode_page(
+            mode="patent-crossk",
+            title="Патентна версія: усереднення по T через усі k",
+            eyebrow="Третя патентна версія",
+            lead=(
+                "Ця сторінка використовує патентну логіку через "
+                "<code>A[i + 2<sup>k</sup>] - A[i]</code>, але фінально збирає "
+                "однакові <code>T</code> наскрізь через усі <code>k</code> і усереднює їхні амплітуди."
+            ),
+            api_path="/api/analyze/patent-crossk",
+        )
+
     @app.get("/healthz")
     def healthz():
         return jsonify({"status": "ok"})
@@ -91,6 +105,10 @@ def create_app() -> Flask:
     @app.post("/api/analyze/article")
     def api_analyze_article():
         return handle_analyze(mode="article")
+
+    @app.post("/api/analyze/patent-crossk")
+    def api_analyze_patent_crossk():
+        return handle_analyze(mode="patent-crossk")
 
     return app
 
