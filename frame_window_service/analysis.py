@@ -628,6 +628,28 @@ def group_intervals(all_intervals: list[dict[str, Any]]) -> list[dict[str, Any]]
     return groups
 
 
+def build_patent_spectrum_groups(k_analyses: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped_rows: dict[tuple[int, Any], list[dict[str, Any]]] = {}
+    for analysis in k_analyses:
+        for row in analysis["intervals"]:
+            branch = row["startSubseriesIndex"]
+            grouped_rows.setdefault((analysis["k"], branch), []).append(dict(row))
+
+    spectrum_groups: list[dict[str, Any]] = []
+    for (k, branch), rows in sorted(grouped_rows.items(), key=lambda item: (item[0][0], str(item[0][1]))):
+        local_groups = group_intervals(rows)
+        for group in local_groups:
+            enriched = dict(group)
+            enriched["k"] = k
+            enriched["branch"] = branch
+            spectrum_groups.append(enriched)
+
+    for index, group in enumerate(spectrum_groups, start=1):
+        group["groupIndex"] = index
+
+    return spectrum_groups
+
+
 def build_article_spectrum_groups(k_analyses: list[dict[str, Any]]) -> list[dict[str, Any]]:
     groups: list[dict[str, Any]] = []
     for analysis in k_analyses:
@@ -714,7 +736,7 @@ def analyze_text(
     if mode == "article":
         spectrum_groups = build_article_spectrum_groups(k_analyses)
     else:
-        spectrum_groups = grouped
+        spectrum_groups = build_patent_spectrum_groups(k_analyses)
 
     return {
         "mode": mode,
