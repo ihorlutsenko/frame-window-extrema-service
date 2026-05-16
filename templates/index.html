@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Фреймовий аналіз екстремумів</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body data-api-analyze-path="{{ url_for('api_analyze') }}">
+    <main class="page">
+      <section class="hero panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Окремий фреймовий аналіз</p>
+          <h1>Екстремуми, різниці амплітуд і часові інтервали</h1>
+          <p class="lead">
+            Завантаж текстовий файл, де кожен рядок містить одне число. Сервер вибере
+            фрейм, знайде локальні екстремуми, проаналізує ряди
+            <code>A[i + 2<sup>k</sup>] - A[i]</code> і побудує фінальний графік
+            усереднених амплітуд за групами часових інтервалів.
+          </p>
+        </div>
+
+        <form id="analyze-form" class="hero-form">
+          <label class="field field-wide">
+            <span>Файл з даними (.txt або .csv)</span>
+            <input id="file-input" name="file" type="file" accept=".txt,.csv,text/plain,text/csv" required>
+          </label>
+
+          <div class="field-group">
+            <h2>Фіксований фрейм</h2>
+            <div class="grid two">
+              <label class="field">
+                <span>Розмір фрейму</span>
+                <input name="frame_size" type="number" min="1" step="1" placeholder="100">
+              </label>
+              <label class="field">
+                <span>Номер фрейму</span>
+                <input name="frame_number" type="number" min="1" step="1" placeholder="1">
+              </label>
+            </div>
+          </div>
+
+          <div class="field-group">
+            <h2>Ручний діапазон</h2>
+            <p class="hint">Якщо він заповнений, саме він має пріоритет над номером фрейму.</p>
+            <div class="grid two">
+              <label class="field">
+                <span>Початкове спостереження</span>
+                <input name="manual_start" type="number" min="1" step="1" placeholder="301">
+              </label>
+              <label class="field">
+                <span>Кінцеве спостереження</span>
+                <input name="manual_end" type="number" min="1" step="1" placeholder="500">
+              </label>
+            </div>
+          </div>
+
+          <div class="grid two compact">
+            <label class="field">
+              <span>M</span>
+              <input name="max_k" type="number" min="0" step="1" placeholder="усі можливі k">
+            </label>
+            <div class="cta-wrap">
+              <button id="submit-button" type="submit">Аналізувати</button>
+            </div>
+          </div>
+        </form>
+
+        <div id="status" class="status">Очікується файл і параметри фрейму.</div>
+      </section>
+
+      <section class="layout">
+        <aside class="panel sidebar">
+          <div class="sidebar-block">
+            <h2>Підсумок</h2>
+            <div id="summary" class="summary empty">Поки що немає результату.</div>
+          </div>
+
+          <div class="sidebar-block">
+            <div class="sidebar-head">
+              <h2>Експорт</h2>
+              <button id="download-json" type="button" disabled>Завантажити JSON</button>
+            </div>
+            <details class="json-preview">
+              <summary>Попередній перегляд</summary>
+              <pre id="json-preview">{}</pre>
+            </details>
+          </div>
+        </aside>
+
+        <section class="content">
+          <div id="charts" class="charts">
+            <section class="panel empty-panel">
+              <h2>Графіки ще не побудовані</h2>
+              <p>
+                Після аналізу тут з’являться:
+                графік екстремумів, графіки для кожного <code>k</code> та фінальний
+                графік усереднених амплітуд.
+              </p>
+            </section>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>

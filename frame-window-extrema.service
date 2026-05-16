@@ -1,0 +1,14 @@
+[Unit]
+Description=Frame-window extrema analysis web service
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/ubuntu/frame-window-extrema-service
+Environment=PORT=8126
+ExecStart=/home/ubuntu/frame-window-extrema-service/.venv/bin/python /home/ubuntu/frame-window-extrema-service/serve.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target
