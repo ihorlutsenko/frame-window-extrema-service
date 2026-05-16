@@ -97,6 +97,33 @@ code {
   background: rgba(255, 255, 255, 0.78);
 }
 
+.nav-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.86);
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.nav-tile:hover {
+  transform: translateY(-1px);
+  border-color: rgba(36, 98, 124, 0.35);
+  box-shadow: 0 12px 30px rgba(71, 54, 40, 0.08);
+}
+
+.nav-tile strong {
+  font-size: 1.04rem;
+}
+
+.nav-tile span {
+  color: var(--muted);
+}
+
 .field-group h2 {
   margin-bottom: 10px;
   font-size: 1.02rem;

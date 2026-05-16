@@ -3,21 +3,16 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Фреймовий аналіз екстремумів</title>
+    <title>{{ page_title }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
   </head>
-  <body data-api-analyze-path="{{ url_for('api_analyze') }}">
+  <body data-api-analyze-path="{{ api_path }}" data-analysis-mode="{{ mode }}">
     <main class="page">
       <section class="hero panel">
         <div class="hero-copy">
-          <p class="eyebrow">Окремий фреймовий аналіз</p>
-          <h1>Екстремуми, різниці амплітуд і часові інтервали</h1>
-          <p class="lead">
-            Завантаж текстовий файл, де кожен рядок містить одне число. Сервер вибере
-            фрейм, знайде локальні екстремуми, проаналізує ряди
-            <code>A[i + 2<sup>k</sup>] - A[i]</code> і побудує фінальний графік
-            усереднених амплітуд за групами часових інтервалів.
-          </p>
+          <p class="eyebrow">{{ eyebrow }}</p>
+          <h1>{{ page_title }}</h1>
+          <p class="lead">{{ lead | safe }}</p>
         </div>
 
         <form id="analyze-form" class="hero-form">
@@ -93,9 +88,8 @@
             <section class="panel empty-panel">
               <h2>Графіки ще не побудовані</h2>
               <p>
-                Після аналізу тут з’являться:
-                графік екстремумів, графіки для кожного <code>k</code> та фінальний
-                графік усереднених амплітуд.
+                Після аналізу тут з’являться графік екстремумів, графіки для кожного
+                рівня <code>k</code> та фінальні агреговані результати.
               </p>
             </section>
           </div>

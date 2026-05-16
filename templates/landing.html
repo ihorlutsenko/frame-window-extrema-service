@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="uk">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CGV аналіз: вибір версії</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Дві окремі реалізації</p>
+          <h1>CGV аналіз: патентна і статейна версії</h1>
+          <p class="lead">
+            Тут розведено дві різні логіки обробки сигналу, щоб порівнювати результати
+            без змішування методик.
+          </p>
+        </div>
+        <div class="hero-form">
+          <div class="field-group">
+            <h2>Вибір сторінки</h2>
+            <div class="grid two">
+              <a class="nav-tile" href="/patent/">
+                <strong>Патентна версія</strong>
+                <span>Логіка через <code>A[i + 2<sup>k</sup>] - A[i]</code>, зміни знака і часові інтервали.</span>
+              </a>
+              <a class="nav-tile" href="/article/">
+                <strong>Статейна версія</strong>
+                <span>Логіка через сусідні екстремуми і рекурсивне прорідження масиву.</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

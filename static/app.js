@@ -93,6 +93,7 @@ function renderSummary(result) {
     : `Фрейм ${frameInfo.frameNumber} по ${frameInfo.frameSize} спостережень`;
 
   const cards = [
+    ["Режим", result.modeName || result.mode || "невідомо"],
     ["Файл", result.filename],
     ["Вхідних спостережень", result.sourceCount],
     ["Обраний режим", modeText],
@@ -792,10 +793,12 @@ function renderExtremaCard(result) {
   });
 }
 
-function renderKCard(analysis, extrema) {
-  const signChangeDisplayOrdinals = new Set(
-    analysis.signChanges.map((row) => row.extremumOrdinal),
+function renderKCard(analysis, extrema, mode) {
+  const signChangeDisplayKeys = new Set(
+    analysis.signChanges.map((row) => row.displayKey || String(row.extremumOrdinal)),
   );
+  const displayExtrema = analysis.displayExtrema || extrema;
+  const isArticle = mode === "article";
 
   const series = [
     {
@@ -808,11 +811,11 @@ function renderKCard(analysis, extrema) {
       name: "Амплітуда екстремума",
       color: colors.amplitude,
       type: "stem",
-      points: extrema.map((row) => ({
+      points: displayExtrema.map((row) => ({
         x: row.localIndex,
         y: row.value,
-        label: row.ordinal,
-        labelColor: signChangeDisplayOrdinals.has(row.ordinal) ? colors.signedDiff : colors.amplitude,
+        label: row.displayLabel || row.ordinal,
+        labelColor: signChangeDisplayKeys.has(row.displayKey || String(row.ordinal)) ? colors.signedDiff : colors.amplitude,
       })),
     },
     {
@@ -833,14 +836,22 @@ function renderKCard(analysis, extrema) {
   ];
 
   const card = createChartCard({
-    title: `Графік для k = ${analysis.k}`,
+    title: isArticle ? `Графік для рівня k = ${analysis.k}` : `Графік для k = ${analysis.k}`,
     meta: `Крок 2^k = ${analysis.step}. Внутрішніх різниць: ${analysis.diffRows.length}. Змін знака: ${analysis.signChanges.length}. Різниць між вибраними екстремумами: ${analysis.signChangeDiffRows.length}. Інтервалів: ${analysis.intervals.length}.`,
     series,
     xLabel: "Номер спостереження екстремума",
     yLabel: "Амплітуда / різниця амплітуд",
-    note: analysis.signChanges.length
-      ? "Сині лінії показують амплітуди всіх екстремумів, червоні й зелені лишаються початковими різницями A[j] - A[j-2^k], а помаранчеві показують модулі різниць між сусідніми вибраними екстремумами в межах відповідної підпослідовності для цього k."
-      : "Для цього k у вибраному фреймі не вистачає екстремумів.",
+    note: isArticle
+      ? (
+        analysis.intervals.length
+          ? "Статейна версія: сині лінії показують екстремуми поточного рівня, червоні та зелені — signed/abs різниці між сусідніми екстремумами цього рівня, а рівні k будуються рекурсивним прорідженням масиву."
+          : "Для цього рівня у статейній версії більше не вистачає екстремумів."
+      )
+      : (
+        analysis.signChanges.length
+          ? "Патентна версія: сині лінії показують амплітуди всіх екстремумів, червоні й зелені лишаються початковими різницями A[j] - A[j-2^k], а помаранчеві показують модулі різниць між сусідніми вибраними екстремумами в межах відповідної підпослідовності для цього k."
+          : "Для цього k у вибраному фреймі не вистачає екстремумів."
+      ),
   });
 
   card.appendChild(createIntervalTimeline(analysis.intervals));
@@ -879,6 +890,7 @@ function renderAggregateCard(result, aggregateOrangeRows) {
 
 function renderSpectrumCard(result) {
   const groups = result.spectrumGroups || result.aggregateGroups || [];
+  const isArticle = result.mode === "article";
   const series = [
     {
       name: "Спектральні складові",
@@ -901,7 +913,11 @@ function renderSpectrumCard(result) {
     xLabel: "f = 1 / (2T)",
     yLabel: "Усереднений модуль різниці амплітуд",
     note: groups.length
-      ? "Цей графік показує ті самі групи, але вже у частотній області за формулою f = 1 / (2T)."
+      ? (
+        isArticle
+          ? "Статейна версія: фінальний спектр будується по рівнях рекурсивного прорідження. Сирі інтервали лишаються у технічних графіках, а у спектрі вони зводяться в одну складову на рівень."
+          : "Цей графік показує ті самі групи, але вже у частотній області за формулою f = 1 / (2T)."
+      )
       : "Недостатньо подій зміни знака, щоб побудувати спектр.",
   });
 }
@@ -914,7 +930,7 @@ function renderCharts(result) {
 
   if (result.kAnalyses.length) {
     result.kAnalyses.forEach((analysis) => {
-      const card = renderKCard(analysis, result.extrema);
+      const card = renderKCard(analysis, result.extrema, result.mode);
       dom.charts.appendChild(card);
       syncIntervalTimelineScale(card);
       kCards.push({ analysis, card });

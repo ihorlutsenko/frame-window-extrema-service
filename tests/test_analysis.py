@@ -4,6 +4,7 @@ import unittest
 
 from frame_window_service.analysis import (
     Extremum,
+    build_article_analyses,
     extract_extrema,
     group_intervals,
     parse_input_text,
@@ -134,6 +135,51 @@ class FrameWindowAnalysisTests(unittest.TestCase):
             result["aggregateGroups"][0]["avgFrequency"],
             1 / (2 * result["aggregateGroups"][0]["avgDuration"]),
         )
+
+    def test_article_mode_builds_recursive_levels(self) -> None:
+        amplitudes = [10, 0, 10, -10, 0, -10, 10, 0, 10, -10, 0, -10]
+        extrema = [
+            Extremum(
+                ordinal=index,
+                global_index=index * 10,
+                local_index=index * 10,
+                value=value,
+                kind="max" if index % 2 else "min",
+            )
+            for index, value in enumerate(amplitudes, start=1)
+        ]
+
+        analyses, effective_max_k = build_article_analyses(extrema, None)
+        self.assertGreaterEqual(effective_max_k, 1)
+        self.assertEqual(analyses[0]["k"], 0)
+        self.assertEqual(analyses[1]["k"], 1)
+        self.assertTrue(analyses[1]["intervals"])
+
+    def test_article_mode_finds_both_166_and_1000_scales_for_sin3x_plus_sinx(self) -> None:
+        import math
+
+        values = []
+        for sample_index in range(5000):
+            x = 2 * math.pi * sample_index / 1000
+            values.append(f"{math.sin(3 * x) + math.sin(x):.5f}")
+
+        result = analyze_text(
+            "\n".join(values),
+            mode="article",
+            frame_size="5000",
+            frame_number="1",
+            manual_start=None,
+            manual_end=None,
+            max_k=None,
+        )
+
+        raw_avg_durations = sorted(round(group["avgDuration"], 2) for group in result["aggregateGroups"])
+        self.assertTrue(any(abs(value - 348.0) < 0.1 for value in raw_avg_durations))
+        self.assertTrue(any(abs(value - 652.0) < 0.1 for value in raw_avg_durations))
+
+        spectrum_avg_durations = sorted(round(group["avgDuration"], 2) for group in result["spectrumGroups"])
+        self.assertTrue(any(abs(value - 166.67) < 1.5 for value in spectrum_avg_durations))
+        self.assertTrue(any(abs(value - 500.0) < 0.3 for value in spectrum_avg_durations))
 
 
 if __name__ == "__main__":

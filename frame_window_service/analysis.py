@@ -31,6 +31,12 @@ class Run:
     sample: Sample
 
 
+@dataclass(frozen=True)
+class SequenceRun:
+    value: float
+    point: Extremum
+
+
 def _parse_number(token: str, line_number: int) -> float:
     normalized = token.strip()
     if not normalized:
@@ -239,6 +245,61 @@ def extract_extrema(samples: list[Sample]) -> list[Extremum]:
     return extrema
 
 
+def _build_sequence_runs(points: list[Extremum]) -> list[SequenceRun]:
+    runs: list[SequenceRun] = []
+    start = 0
+    while start < len(points):
+        end = start + 1
+        while end < len(points) and points[end].value == points[start].value:
+            end += 1
+
+        run_length = end - start
+        representative_offset = (run_length - 1) // 2
+        runs.append(SequenceRun(value=points[start].value, point=points[start + representative_offset]))
+        start = end
+
+    return runs
+
+
+def extract_extrema_from_sequence(points: list[Extremum]) -> list[Extremum]:
+    if len(points) < 3:
+        return []
+
+    runs = _build_sequence_runs(points)
+    if len(runs) < 3:
+        return []
+
+    extrema: list[Extremum] = []
+    ordinal = 1
+    for idx in range(1, len(runs) - 1):
+        prev_run = runs[idx - 1]
+        current_run = runs[idx]
+        next_run = runs[idx + 1]
+
+        kind = None
+        if current_run.value > prev_run.value and current_run.value > next_run.value:
+            kind = "max"
+        elif current_run.value < prev_run.value and current_run.value < next_run.value:
+            kind = "min"
+
+        if kind is None:
+            continue
+
+        base = current_run.point
+        extrema.append(
+            Extremum(
+                ordinal=ordinal,
+                global_index=base.global_index,
+                local_index=base.local_index,
+                value=base.value,
+                kind=kind,
+            )
+        )
+        ordinal += 1
+
+    return extrema
+
+
 def _max_k_for_extrema(extrema_count: int) -> int:
     if extrema_count < 2:
         return -1
@@ -383,6 +444,155 @@ def build_k_analyses(extrema: list[Extremum], max_k_raw: str | None) -> tuple[li
     return analyses, effective_max_k
 
 
+def _article_rows_for_sequence(
+    points: list[Extremum],
+    *,
+    branch_label: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    diff_rows: list[dict[str, Any]] = []
+    sign_changes: list[dict[str, Any]] = []
+    sign_change_diff_rows: list[dict[str, Any]] = []
+    intervals: list[dict[str, Any]] = []
+
+    if len(points) < 2:
+        return diff_rows, sign_changes, sign_change_diff_rows, intervals
+
+    previous_sign = None
+    for current, shifted in zip(points, points[1:]):
+        signed_diff = shifted.value - current.value
+        row = {
+            "startOrdinal": current.ordinal,
+            "startLocalIndex": current.local_index,
+            "startGlobalIndex": current.global_index,
+            "startAmplitude": current.value,
+            "endOrdinal": shifted.ordinal,
+            "endLocalIndex": shifted.local_index,
+            "endGlobalIndex": shifted.global_index,
+            "endAmplitude": shifted.value,
+            "signedDiff": signed_diff,
+            "absDiff": abs(signed_diff),
+            "subseriesIndex": branch_label,
+        }
+        diff_rows.append(row)
+        sign = _sign(signed_diff)
+        if sign != 0 and previous_sign is not None and sign != previous_sign:
+            sign_changes.append(
+                {
+                    "localIndex": shifted.local_index,
+                    "globalIndex": shifted.global_index,
+                    "extremumOrdinal": shifted.ordinal,
+                    "displayKey": f"{branch_label}:{shifted.ordinal}",
+                    "amplitude": shifted.value,
+                    "signedDiff": signed_diff,
+                    "absDiff": abs(signed_diff),
+                    "subseriesIndex": branch_label,
+                }
+            )
+        if sign != 0:
+            previous_sign = sign
+
+        sign_change_diff_rows.append(
+            {
+                "startLocalIndex": current.local_index,
+                "endLocalIndex": shifted.local_index,
+                "startGlobalIndex": current.global_index,
+                "endGlobalIndex": shifted.global_index,
+                "startOrdinal": current.ordinal,
+                "endOrdinal": shifted.ordinal,
+                "startAmplitude": current.value,
+                "endAmplitude": shifted.value,
+                "signedAmplitudeDiff": signed_diff,
+                "absAmplitudeDiff": abs(signed_diff),
+                "startSubseriesIndex": branch_label,
+                "endSubseriesIndex": branch_label,
+            }
+        )
+        intervals.append(
+            {
+                "startLocalIndex": current.local_index,
+                "endLocalIndex": shifted.local_index,
+                "startGlobalIndex": current.global_index,
+                "endGlobalIndex": shifted.global_index,
+                "duration": shifted.local_index - current.local_index,
+                "absAmplitudeDiff": abs(signed_diff),
+                "startAmplitude": current.value,
+                "endAmplitude": shifted.value,
+                "startSubseriesIndex": branch_label,
+                "endSubseriesIndex": branch_label,
+            }
+        )
+
+    return diff_rows, sign_changes, sign_change_diff_rows, intervals
+
+
+def build_article_analyses(extrema: list[Extremum], max_k_raw: str | None) -> tuple[list[dict[str, Any]], int]:
+    if len(extrema) < 2:
+        return [], -1
+
+    requested = _as_nonnegative_int(max_k_raw, "M")
+    analyses: list[dict[str, Any]] = []
+    current_sequences: list[tuple[str, list[Extremum]]] = [("base", extrema)]
+    level = 0
+
+    while current_sequences and (requested is None or level <= requested):
+        diff_rows: list[dict[str, Any]] = []
+        sign_changes: list[dict[str, Any]] = []
+        sign_change_diff_rows: list[dict[str, Any]] = []
+        intervals: list[dict[str, Any]] = []
+        display_extrema: list[dict[str, Any]] = []
+
+        for branch_label, sequence in current_sequences:
+            local_diff_rows, local_sign_changes, local_sign_change_diff_rows, local_intervals = _article_rows_for_sequence(
+                sequence,
+                branch_label=branch_label,
+            )
+            diff_rows.extend(local_diff_rows)
+            sign_changes.extend(local_sign_changes)
+            sign_change_diff_rows.extend(local_sign_change_diff_rows)
+            intervals.extend(local_intervals)
+            display_extrema.extend(
+                {
+                    "ordinal": item.ordinal,
+                    "displayKey": f"{branch_label}:{item.ordinal}",
+                    "displayLabel": f"{branch_label}.{item.ordinal}",
+                    "globalIndex": item.global_index,
+                    "localIndex": item.local_index,
+                    "value": item.value,
+                    "kind": item.kind,
+                    "branch": branch_label,
+                }
+                for item in sequence
+            )
+
+        analyses.append(
+            {
+                "k": level,
+                "step": 2**level,
+                "diffRows": sorted(diff_rows, key=lambda row: (row["endLocalIndex"], row["startLocalIndex"])),
+                "signChanges": sorted(sign_changes, key=lambda row: (row["localIndex"], row["extremumOrdinal"])),
+                "signChangeDiffRows": sorted(
+                    sign_change_diff_rows,
+                    key=lambda row: (row["endLocalIndex"], row["startLocalIndex"]),
+                ),
+                "intervals": sorted(intervals, key=lambda row: (row["startLocalIndex"], row["endLocalIndex"])),
+                "displayExtrema": sorted(display_extrema, key=lambda row: (row["localIndex"], row["ordinal"], row["branch"])),
+            }
+        )
+
+        next_sequences: list[tuple[str, list[Extremum]]] = []
+        for branch_label, sequence in current_sequences:
+            for filter_kind in ("max", "min"):
+                filtered = [item for item in sequence if item.kind == filter_kind]
+                reduced = extract_extrema_from_sequence(filtered)
+                if len(reduced) >= 2:
+                    next_sequences.append((f"{branch_label}:{filter_kind}", reduced))
+
+        current_sequences = next_sequences
+        level += 1
+
+    return analyses, len(analyses) - 1
+
+
 def group_intervals(all_intervals: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if not all_intervals:
         return []
@@ -418,6 +628,34 @@ def group_intervals(all_intervals: list[dict[str, Any]]) -> list[dict[str, Any]]
     return groups
 
 
+def build_article_spectrum_groups(k_analyses: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    for analysis in k_analyses:
+        intervals = analysis["intervals"]
+        if not intervals:
+            continue
+
+        durations = [row["duration"] for row in intervals]
+        amplitude_moduli = [row["absAmplitudeDiff"] for row in intervals]
+        avg_duration = sum(durations) / len(durations)
+        avg_amplitude = sum(amplitude_moduli) / (2 * len(amplitude_moduli))
+        groups.append(
+            {
+                "groupIndex": len(groups) + 1,
+                "k": analysis["k"],
+                "avgDuration": avg_duration,
+                "avgAmplitude": avg_amplitude,
+                "avgFrequency": 1.0 / (2.0 * avg_duration),
+                "count": len(intervals),
+                "minDuration": min(durations),
+                "maxDuration": max(durations),
+                "rows": intervals,
+            }
+        )
+
+    return groups
+
+
 def _sample_rows(samples: list[Sample]) -> list[dict[str, Any]]:
     return [
         {"globalIndex": sample.global_index, "localIndex": sample.local_index, "value": sample.value}
@@ -441,6 +679,7 @@ def _extrema_rows(extrema: list[Extremum]) -> list[dict[str, Any]]:
 def analyze_text(
     text: str,
     *,
+    mode: str = "patent",
     frame_size: str | None,
     frame_number: str | None,
     manual_start: str | None,
@@ -457,7 +696,12 @@ def analyze_text(
         manual_end_raw=manual_end,
     )
     extrema = extract_extrema(frame_samples)
-    k_analyses, effective_max_k = build_k_analyses(extrema, max_k)
+    if mode == "article":
+        k_analyses, effective_max_k = build_article_analyses(extrema, max_k)
+        mode_name = "Статейна логіка"
+    else:
+        k_analyses, effective_max_k = build_k_analyses(extrema, max_k)
+        mode_name = "Патентна логіка"
 
     all_intervals: list[dict[str, Any]] = []
     for analysis in k_analyses:
@@ -467,8 +711,14 @@ def analyze_text(
             all_intervals.append(row_with_k)
 
     grouped = group_intervals(all_intervals)
+    if mode == "article":
+        spectrum_groups = build_article_spectrum_groups(k_analyses)
+    else:
+        spectrum_groups = grouped
 
     return {
+        "mode": mode,
+        "modeName": mode_name,
         "filename": filename or "uploaded.txt",
         "frameInfo": frame_info,
         "sourceCount": len(source_points),
@@ -477,5 +727,5 @@ def analyze_text(
         "kAnalyses": k_analyses,
         "effectiveMaxK": effective_max_k,
         "aggregateGroups": grouped,
-        "spectrumGroups": grouped,
+        "spectrumGroups": spectrum_groups,
     }
